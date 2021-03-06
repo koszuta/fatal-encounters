@@ -1,0 +1,3 @@
+CREATE SCHEMA audit;
+CREATE SCHEMA fe;
+CREATE ROLE fe LOGIN PASSWORD '<dbpassword>';
