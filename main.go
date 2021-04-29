@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/csv"
@@ -111,6 +112,13 @@ func main() {
 
 	// Save data to a file (if any)
 	if count > 0 {
+		reader := bufio.NewReader(os.Stdin)
+		log.Println("commit? y/n")
+		input, _ := reader.ReadString('\n')
+		if !strings.EqualFold(strings.TrimSpace(input), "Y") {
+			log.Panicln("rolling back changes...")
+		}
+
 		filePath := fmt.Sprintf(fileNameFormat, time.Now().UTC().Format(fileDateFormat))
 		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, perms)
 		fe.PanicOnErrorWithReason(err, "couldn't create file")
@@ -118,8 +126,9 @@ func main() {
 		n, err := file.Write(body)
 		fe.PanicOnErrorWithReason(err, "couldn't save data to %s", filePath)
 		log.Printf("wrote %d chars to %s\n", n, filePath)
-	}
 
-	err = tx.Commit()
-	fe.PanicOnError(err)
+		err = tx.Commit()
+		fe.PanicOnError(err)
+		log.Println("changes committed...")
+	}
 }

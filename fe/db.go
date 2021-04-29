@@ -23,10 +23,5 @@ func init() {
 // OpenDB ...
 func OpenDB() (*sql.DB, error) {
 	source := fmt.Sprintf("user=%s password=%s database=%s sslmode=disable", user, password, database)
-	db, err := sql.Open(driver, source)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
+	return sql.Open(driver, source)
 }

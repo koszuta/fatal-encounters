@@ -28,6 +28,8 @@ const (
 	allegedWeaponColumn
 	aggressiveMovementColumn
 	wasFleeingColumn
+	tempDescriptionColumn
+	tempURLColumn
 	descriptionColumn
 	xDispositionExclusionColumn
 	useOfForceColumn

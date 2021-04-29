@@ -65,13 +65,13 @@ func ParseRow(values []string) (Encounter, error) {
 	probStr := values[raceImputationProbColumn]
 	imputationProb, probErr := strconv.ParseFloat(probStr, 64)
 	if probErr != nil {
-		if probStr == "Not imputed" || (raceStr != "Race unspecified" && raceStr == raceImputedStr) {
+		if strings.EqualFold(probStr, "Not imputed") || (!strings.EqualFold(raceStr, "Race unspecified") && strings.EqualFold(raceStr, raceImputedStr)) {
 			imputationProb = 1.0
 			probErr = nil
-		} else if probStr != "NA" && probStr != "Race not determined" {
+		} else if !strings.EqualFold(probStr, "NA") && !strings.EqualFold(probStr, "Race not determined") {
 			log.Printf("uID:%d couldn't parse imputation probability: %v\n", uID, probErr)
 		}
-	} else if raceImputedStr == "Race unspecified" || raceImputedStr == "NA" {
+	} else if strings.EqualFold(raceImputedStr, "Race unspecified") || strings.EqualFold(raceImputedStr, "NA") {
 		log.Printf("uID:%d race:%s raceImputed:%s prob:%f\n", uID, raceStr, raceImputedStr, imputationProb)
 	}
 
