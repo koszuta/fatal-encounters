@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/flate"
 	"compress/gzip"
 	"context"
 	"encoding/csv"
@@ -122,7 +123,8 @@ func main() {
 
 		filePath := fmt.Sprintf(fileNameFormat, time.Now().UTC().Format(fileDateFormat))
 		var b bytes.Buffer
-		w := gzip.NewWriter(&b)
+		w, err := gzip.NewWriterLevel(&b, flate.BestCompression)
+		fe.PanicOnErrorWithReason(err, "couldn't create gzip writer")
 		w.Write(body)
 		w.Close() // You must close this first to flush the bytes to the buffer.
 		err = ioutil.WriteFile(filePath+".gz", b.Bytes(), 0666)
