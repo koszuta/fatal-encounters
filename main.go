@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/csv"
 	"errors"
@@ -20,7 +21,6 @@ const dataURL = "https://docs.google.com/spreadsheets/d/1dKmaV_JiWcG8XBoRgP8b4e9
 const fileNameFormat = "data/fatal-encounters-%s.csv"
 const fileDateFormat = "2006-01-02T15.04.05"
 const headersPathFormat = "headers/v%d.csv"
-const perms = os.FileMode(0666)
 
 // hmm aud_id: 265376
 
@@ -80,7 +80,7 @@ func main() {
 	// Drop header row
 	rows = rows[1:]
 
-	encounters := make([]fe.Encounter, 0, 0)
+	encounters := make([]fe.Encounter, 0)
 	for i, row := range rows {
 		e, err := fe.ParseRow(row)
 		fe.PanicOnErrorWithReason(err, "parse error in row %d", i+1)
@@ -101,6 +101,7 @@ func main() {
 	ctx := context.Background()
 	tx, err := db.BeginTx(ctx, nil)
 	defer tx.Rollback()
+	fe.PanicOnErrorWithReason(err, "couldn't open transaction")
 
 	count := 0
 	for _, e := range encounters {
@@ -120,12 +121,13 @@ func main() {
 		}
 
 		filePath := fmt.Sprintf(fileNameFormat, time.Now().UTC().Format(fileDateFormat))
-		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, perms)
-		fe.PanicOnErrorWithReason(err, "couldn't create file")
-		defer file.Close()
-		n, err := file.Write(body)
+		var b bytes.Buffer
+		w := gzip.NewWriter(&b)
+		w.Write(body)
+		w.Close() // You must close this first to flush the bytes to the buffer.
+		err = ioutil.WriteFile(filePath+".gz", b.Bytes(), 0666)
 		fe.PanicOnErrorWithReason(err, "couldn't save data to %s", filePath)
-		log.Printf("wrote %d chars to %s\n", n, filePath)
+		log.Printf("wrote %d bytes to %s\n", len(b.Bytes()), filePath)
 
 		err = tx.Commit()
 		fe.PanicOnError(err)

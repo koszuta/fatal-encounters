@@ -39,14 +39,14 @@ const (
 	blankColumn2
 	uIDFormulaColumn
 	redundantUIDColumn
-	blankColumn3
-	blankColumn4
-	blankColumn5
-	blankColumn6
-	blankColumn7
-	blankColumn8
-	blankColumn9
-	blankColumn10
-	blankColumn11
-	blankColumn12
+	// blankColumn3
+	// blankColumn4
+	// blankColumn5
+	// blankColumn6
+	// blankColumn7
+	// blankColumn8
+	// blankColumn9
+	// blankColumn10
+	// blankColumn11
+	// blankColumn12
 )
