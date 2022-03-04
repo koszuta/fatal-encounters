@@ -29,6 +29,8 @@ func main() {
 	log.Println("go...")
 	defer log.Println("...done.")
 
+	currentTimeStr := time.Now().UTC().Format(fileDateFormat)
+
 	// Fetch data from Google Sheets
 	res, err := http.Get(dataURL)
 	fe.PanicOnErrorWithReason(err, "couldn't get data from %s", dataURL)
@@ -121,7 +123,7 @@ func main() {
 			log.Panicln("rolling back changes...") // deferred
 		}
 
-		filePath := fmt.Sprintf(fileNameFormat, time.Now().UTC().Format(fileDateFormat))
+		filePath := fmt.Sprintf(fileNameFormat, currentTimeStr)
 		var b bytes.Buffer
 		w, err := gzip.NewWriterLevel(&b, flate.BestCompression)
 		fe.PanicOnErrorWithReason(err, "couldn't create gzip writer")
