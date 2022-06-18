@@ -117,10 +117,14 @@ func main() {
 	// Save data to a file (if any)
 	if count > 0 {
 		reader := bufio.NewReader(os.Stdin)
-		log.Print("commit (y/n)?")
-		input, _ := reader.ReadString('\n')
-		if !strings.EqualFold(strings.TrimSpace(input), "Y") {
-			log.Panicln("rolling back changes...") // deferred
+		var input string
+		for !strings.EqualFold(strings.TrimSpace(input), "y") && !strings.EqualFold(strings.TrimSpace(input), "n") {
+			log.Print("commit (y/n)?")
+			input, _ = reader.ReadString('\n')
+		}
+		if !strings.EqualFold(strings.TrimSpace(input), "y") {
+			log.Println("rolling back changes...") // deferred
+			return
 		}
 
 		filePath := fmt.Sprintf(fileNameFormat, currentTimeStr)
