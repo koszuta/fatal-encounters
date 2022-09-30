@@ -16,6 +16,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/cheggaaa/pb"
 )
 
 const dataURL = "https://docs.google.com/spreadsheets/d/1dKmaV_JiWcG8XBoRgP8b4e9Eopkpgt7FL7nyspvzAsE/export?format=csv&id=1dKmaV_JiWcG8XBoRgP8b4e9Eopkpgt7FL7nyspvzAsE&gid=0"
@@ -107,11 +109,14 @@ func main() {
 	fe.PanicOnErrorWithReason(err, "couldn't open transaction")
 
 	count := 0
+	pb := pb.StartNew(len(encounters))
 	for _, e := range encounters {
 		if e.InsertOrUpdate(tx) {
 			count++
 		}
+		pb.Increment()
 	}
+	pb.Finish()
 	log.Printf("adds/updates=%d\n", count)
 
 	// Save data to a file (if any)
