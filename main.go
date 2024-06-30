@@ -7,49 +7,51 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"errors"
 	"fatal-encounters/fe"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/cheggaaa/pb"
 )
 
-const dataURL = "https://docs.google.com/spreadsheets/d/1dKmaV_JiWcG8XBoRgP8b4e9Eopkpgt7FL7nyspvzAsE/export?format=csv&id=1dKmaV_JiWcG8XBoRgP8b4e9Eopkpgt7FL7nyspvzAsE&gid=0"
-const fileNameFormat = "data/fatal-encounters-%s.csv"
-const fileDateFormat = "2006-01-02T15.04.05"
-const headersPathFormat = "headers/v%d.csv"
+const (
+	dataURL           = "https://docs.google.com/spreadsheets/d/1dKmaV_JiWcG8XBoRgP8b4e9Eopkpgt7FL7nyspvzAsE/export?format=csv&id=1dKmaV_JiWcG8XBoRgP8b4e9Eopkpgt7FL7nyspvzAsE&gid=0"
+	fileNameFormat    = "data/fatal-encounters-%s.csv"
+	fileDateFormat    = "2006-01-02T15.04.05"
+	headersPathFormat = "headers/v%d.csv"
+)
 
 // hmm aud_id: 265376
 
 func main() {
-	log.Println("go...")
-	defer log.Println("...done.")
-
-	currentTimeStr := time.Now().UTC().Format(fileDateFormat)
-
 	// Fetch data from Google Sheets
 	res, err := http.Get(dataURL)
-	fe.PanicOnErrorWithReason(err, "couldn't get data from %s", dataURL)
+	if err != nil {
+		log.Fatalf("couldn't get data from %s: %v\n", dataURL, err)
+	}
 
 	// Read data from response
-	body, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	fe.PanicOnErrorWithReason(err, "couldn't read data")
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		log.Fatalln("couldn't read data:", err)
+	}
+	defer res.Body.Close()
 
 	// Parse CSV
 	rows, err := csv.NewReader(bytes.NewReader(body)).ReadAll()
-	fe.PanicOnErrorWithReason(err, "couldn't parse data")
+	if err != nil {
+		log.Fatalln("couldn't parse data:", err)
+	}
 
-	// Validate CSV
-	{
+	{ // validate CSV
 		if len(rows) == 0 {
-			fe.PanicOnError(errors.New("invalid data: must contain at least a header row"))
+			log.Fatalln("invalid data: must contain at least a header row")
 		}
 
 		v := 1
@@ -64,7 +66,9 @@ func main() {
 			defer headersFile.Close()
 
 			headers, err := csv.NewReader(headersFile).Read()
-			fe.PanicOnErrorWithReason(err, "couldn't parse expected headers in %s", headersPath)
+			if err != nil {
+				log.Fatalf("couldn't parse expected headers in %s: %v\n", headersPath, err)
+			}
 
 			if len(rows[0]) == len(headers) {
 				for i, header := range rows[0] {
@@ -78,7 +82,9 @@ func main() {
 			}
 			v++
 		}
-		fe.PanicOnError(verErr)
+		if verErr != nil {
+			log.Fatalln(verErr)
+		}
 		log.Printf("data version: v%d\n", v)
 	}
 
@@ -87,28 +93,29 @@ func main() {
 
 	encounters := make([]fe.Encounter, 0)
 	for i, row := range rows {
-		e, err := fe.ParseRow(row)
-		fe.PanicOnErrorWithReason(err, "parse error in row %d", i+1)
-
-		if e.UID.Valid {
+		if e, err := fe.ParseRow(row); err != nil {
+			log.Fatalf("parse error in row %d: %v\n", i+1, err)
+		} else if e.UID.Valid {
 			encounters = append(encounters, e)
 		}
 	}
-
-	fe.PanicOnError(err)
-	log.Printf("encounters=%d\n", len(encounters))
+	log.Printf("n encounters=%d\n", len(encounters))
 
 	// Open database connection
 	db, err := fe.OpenDB()
-	fe.PanicOnError(err)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	defer db.Close()
 
 	ctx := context.Background()
 	tx, err := db.BeginTx(ctx, nil)
-	defer tx.Rollback()
-	fe.PanicOnErrorWithReason(err, "couldn't open transaction")
+	if err != nil {
+		log.Fatalln("couldn't open transaction:", err)
+	}
+	defer tx.Rollback() // ok to call after Commit
 
-	count := 0
+	var count int
 	pb := pb.StartNew(len(encounters))
 	for _, e := range encounters {
 		if e.InsertOrUpdate(tx) {
@@ -117,33 +124,48 @@ func main() {
 		pb.Increment()
 	}
 	pb.Finish()
-	log.Printf("adds/updates=%d\n", count)
+	log.Printf("n adds/updates=%d\n", count)
+
+	if count == 0 {
+		return
+	}
 
 	// Save data to a file (if any)
-	if count > 0 {
-		reader := bufio.NewReader(os.Stdin)
-		var input string
-		for !strings.EqualFold(strings.TrimSpace(input), "y") && !strings.EqualFold(strings.TrimSpace(input), "n") {
-			log.Print("commit (y/n)?")
-			input, _ = reader.ReadString('\n')
-		}
-		if !strings.EqualFold(strings.TrimSpace(input), "y") {
+	var input string
+	r := bufio.NewReader(os.Stdin)
+	matchN, matchY := regexp.MustCompile(`^\s*[nN]\s*$`), regexp.MustCompile(`^\s*[yY]\s*$`)
+	for {
+		log.Print("commit (y/n)?")
+		input, _ = r.ReadString('\n')
+		if matchN.MatchString(input) {
 			log.Println("rolling back changes...") // deferred
 			return
 		}
-
-		filePath := fmt.Sprintf(fileNameFormat, currentTimeStr)
-		var b bytes.Buffer
-		w, err := gzip.NewWriterLevel(&b, flate.BestCompression)
-		fe.PanicOnErrorWithReason(err, "couldn't create gzip writer")
-		w.Write(body)
-		w.Close() // You must close this first to flush the bytes to the buffer.
-		err = ioutil.WriteFile(filePath+".gz", b.Bytes(), 0666)
-		fe.PanicOnErrorWithReason(err, "couldn't save data to %s", filePath)
-		log.Printf("wrote %d bytes to %s\n", len(b.Bytes()), filePath)
-
-		err = tx.Commit()
-		fe.PanicOnError(err)
-		log.Println("changes committed...")
+		if matchY.MatchString(input) {
+			break
+		}
 	}
+
+	filePath := fmt.Sprintf(fileNameFormat, time.Now().UTC().Format(fileDateFormat))
+	var buf bytes.Buffer
+	w, err := gzip.NewWriterLevel(&buf, flate.BestCompression)
+	if err != nil {
+		log.Fatalln("couldn't create gzip writer:", err)
+	}
+	if _, err := w.Write(body); err != nil {
+		log.Fatalln(err)
+	}
+	// The writer must be closed to flush the bytes to the buffer
+	if err := w.Close(); err != nil {
+		log.Fatalln(err)
+	}
+	if err := os.WriteFile(filePath+".gz", buf.Bytes(), 0666); err != nil {
+		log.Fatalln("couldn't save data to", filePath, ":", err)
+	}
+	log.Printf("%d bytes written to %s\n", len(buf.Bytes()), filePath)
+
+	if err := tx.Commit(); err != nil {
+		log.Fatalln(err)
+	}
+	log.Println("changes committed...")
 }

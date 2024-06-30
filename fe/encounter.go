@@ -45,7 +45,7 @@ type Encounter struct {
 func ParseRow(values []string) (Encounter, error) {
 	// Check for and skip development rows
 	if values[uIDColumn] == "" {
-		log.Printf("development row found: %s\n", strings.Join(values, ","))
+		log.Printf("development row found: %q\n", strings.Join(values, ","))
 		return Encounter{}, nil
 	}
 
@@ -57,7 +57,7 @@ func ParseRow(values []string) (Encounter, error) {
 	ageStr := values[ageColumn]
 	age, ageErr := strconv.ParseFloat(ageStr, 64)
 	if ageStr != "" && ageErr != nil {
-		log.Printf("uID:%d couldn't parse age: %v\n", uID, ageErr)
+		log.Printf("uID:%d invalid age: %v\n", uID, ageErr)
 	}
 
 	raceStr := values[raceColumn]
@@ -69,7 +69,7 @@ func ParseRow(values []string) (Encounter, error) {
 			imputationProb = 1.0
 			probErr = nil
 		} else if !strings.EqualFold(probStr, "NA") && !strings.EqualFold(probStr, "Race not determined") {
-			log.Printf("uID:%d couldn't parse imputation probability: %v\n", uID, probErr)
+			log.Printf("uID:%d invalid imputation probability: %v\n", uID, probErr)
 		}
 	} else if strings.EqualFold(raceImputedStr, "Race unspecified") || strings.EqualFold(raceImputedStr, "NA") {
 		log.Printf("uID:%d race:%s raceImputed:%s prob:%f\n", uID, raceStr, raceImputedStr, imputationProb)
@@ -77,44 +77,44 @@ func ParseRow(values []string) (Encounter, error) {
 
 	injuryDate, injErr := time.ParseInLocation(dateFormat, values[injuryDateColumn], time.UTC)
 	if injErr != nil {
-		log.Printf("uID:%d couldn't parse injury date: %v\n", uID, injErr)
+		log.Printf("uID:%d invalid injury date: %v\n", uID, injErr)
 	}
 
 	latitude, latErr := strconv.ParseFloat(values[latitudeColumn], 64)
 	if latErr != nil {
-		log.Printf("uID:%d couldn't parse latitude: %v\n", uID, latErr)
+		log.Printf("uID:%d invalid latitude: %v\n", uID, latErr)
 	}
 
 	longitude, lonErr := strconv.ParseFloat(values[longitudeColumn], 64)
 	if lonErr != nil {
-		log.Printf("uID:%d couldn't parse longitude: %v\n", uID, lonErr)
+		log.Printf("uID:%d invalid longitude: %v\n", uID, lonErr)
 	}
 
 	return Encounter{
 		UID:                   sql.NullInt64{Int64: uID, Valid: true},
-		FullName:              TrimAndNullify(values[fullNameColumn]),
+		FullName:              NewSQLString(values[fullNameColumn]),
 		Age:                   sql.NullFloat64{Float64: age, Valid: ageErr == nil},
-		Gender:                TrimAndNullify(values[genderColumn]),
-		Race:                  TrimAndNullify(raceStr),
-		RaceImputed:           TrimAndNullify(raceImputedStr),
+		Gender:                NewSQLString(values[genderColumn]),
+		Race:                  NewSQLString(raceStr),
+		RaceImputed:           NewSQLString(raceImputedStr),
 		RaceImputationProb:    sql.NullFloat64{Float64: imputationProb, Valid: probErr == nil},
-		ImageURL:              TrimAndNullify(values[imageURLColumn]),
+		ImageURL:              NewSQLString(values[imageURLColumn]),
 		InjuryDate:            sql.NullTime{Time: injuryDate, Valid: injErr == nil},
-		Address:               TrimAndNullify(values[addressColumn]),
-		City:                  TrimAndNullify(values[cityColumn]),
-		State:                 TrimAndNullify(values[stateColumn]),
-		ZipCode:               TrimAndNullify(values[zipCodeColumn]),
-		County:                TrimAndNullify(values[countyColumn]),
+		Address:               NewSQLString(values[addressColumn]),
+		City:                  NewSQLString(values[cityColumn]),
+		State:                 NewSQLString(values[stateColumn]),
+		ZipCode:               NewSQLString(values[zipCodeColumn]),
+		County:                NewSQLString(values[countyColumn]),
 		Latitude:              sql.NullFloat64{Float64: latitude, Valid: latErr == nil},
 		Longitude:             sql.NullFloat64{Float64: longitude, Valid: lonErr == nil},
-		Agency:                TrimAndNullify(values[agencyColumn]),
-		CauseOfDeath:          TrimAndNullify(values[causeOfDeathColumn]),
-		Description:           TrimAndNullify(values[descriptionColumn]),
-		UseOfForce:            TrimAndNullify(values[useOfForceColumn]),
-		DocumentationURL:      TrimAndNullify(values[documentationURLColumn]),
-		VideoURL:              sql.NullString{},
-		XDispositionExclusion: TrimAndNullify(values[xDispositionExclusionColumn]),
-		XMentalIllness:        TrimAndNullify(values[xMentalIllnessColumn]),
+		Agency:                NewSQLString(values[agencyColumn]),
+		CauseOfDeath:          NewSQLString(values[causeOfDeathColumn]),
+		Description:           NewSQLString(values[descriptionColumn]),
+		UseOfForce:            NewSQLString(values[useOfForceColumn]),
+		DocumentationURL:      NewSQLString(values[documentationURLColumn]),
+		VideoURL:              NewSQLString(""),
+		XDispositionExclusion: NewSQLString(values[xDispositionExclusionColumn]),
+		XMentalIllness:        NewSQLString(values[xMentalIllnessColumn]),
 	}, nil
 }
 

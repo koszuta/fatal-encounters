@@ -3,38 +3,19 @@ package fe
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 )
 
-// PanicOnError panics if the error is not nil; prints the error
-func PanicOnError(err error) {
-	if err != nil {
-		log.Panicln(err)
-	}
-}
-
-// PanicOnErrorWithReason panics if the error is not nil; prints the formatted reason and error
-func PanicOnErrorWithReason(err error, format string, v ...interface{}) {
-	if err != nil {
-		if v != nil {
-			log.Panicln(fmt.Errorf(format+": %w", v, err))
-		} else {
-			log.Panicln(fmt.Errorf(format+": %w", err))
-		}
-	}
-}
-
-// TrimAndNullify trims and wraps a string in sql.NullString; valid when the trimmed string is not empty
-func TrimAndNullify(s string) sql.NullString {
+// NewSQLString trims and wraps a string in sql.NullString; valid when the trimmed string is not blank
+func NewSQLString(s string) sql.NullString {
 	s = strings.TrimSpace(s)
 	return sql.NullString{String: s, Valid: len(s) != 0}
 }
 
 // StructDiff ...
-func StructDiff(i1, i2 interface{}) string {
-	v1, v2 := reflect.ValueOf(i1), reflect.ValueOf(i2)
+func StructDiff(v, w any) string {
+	v1, v2 := reflect.ValueOf(v), reflect.ValueOf(w)
 	t1, t2 := v1.Type(), v2.Type()
 	typeName := t1.Name()
 	if t1.Kind() != reflect.Struct || t2.Kind() != reflect.Struct {
